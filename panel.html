@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PC-Control</title>
+<style>
+  :root{
+    --bg:#0d1020; --bg2:#141834; --card:#191e3d; --card2:#232a52;
+    --line:#2a3160; --text:#eef1fb; --muted:#9aa3c9; --accent:#5b8cff;
+    --good:#37d67a; --warn:#ffb020; --bad:#ff5c6c; --radius:18px;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#eef1f8; --bg2:#e5e9f5; --card:#ffffff; --card2:#f1f4fb;
+      --line:#dfe4f2; --text:#141a33; --muted:#5b6486; --shadow:0 10px 30px rgba(20,30,70,.10);}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 50% -10%,var(--bg2),var(--bg));
+    color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    min-height:100vh;-webkit-font-smoothing:antialiased;padding:env(safe-area-inset-top) 0 40px}
+  .wrap{max-width:560px;margin:0 auto;padding:20px 16px}
+  h1{font-size:20px;margin:0;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px}
+  .row{display:flex;align-items:center;gap:12px}
+  .between{justify-content:space-between}
+  .muted{color:var(--muted)}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:12px;
+    font-weight:700;transition:transform .08s ease,filter .15s ease}
+  button:active{transform:translateY(1px) scale(.99)}
+  @media (prefers-reduced-motion:reduce){button{transition:none}button:active{transform:none}}
+  .btn{background:var(--accent);color:#0a0e1c;padding:12px 16px;font-size:15px}
+  .btn.block{width:100%}
+  .btn.ghost{background:var(--card2);color:var(--text);border:1px solid var(--line)}
+  .btn.warn{background:var(--warn);color:#231400}
+  .btn.bad{background:var(--bad);color:#2a0006}
+  .btn.good{background:var(--good);color:#022a12}
+  input{font-family:inherit;background:var(--card2);border:1px solid var(--line);
+    color:var(--text);border-radius:12px;padding:12px;font-size:15px;width:100%}
+  input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  label{font-size:12px;color:var(--muted);font-weight:600;display:block;margin:0 0 6px}
+
+  /* ---- Login ---- */
+  #login{min-height:70vh;display:flex;flex-direction:column;justify-content:center}
+  .logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--accent),#8f7bff);
+    display:grid;place-items:center;font-size:28px;margin:0 auto 14px}
+
+  /* ---- Hero / Ring ---- */
+  .hero{display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 18px 22px}
+  .ring{position:relative;width:220px;height:220px}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .track{stroke:var(--line)}
+  .ring .prog{stroke:var(--good);stroke-linecap:round;transition:stroke-dashoffset .6s ease,stroke .3s}
+  @media (prefers-reduced-motion:reduce){.ring .prog{transition:none}}
+  .ring .center{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center}
+  .big{font-size:44px;font-weight:800;line-height:1}
+  .big small{font-size:20px;font-weight:700;color:var(--muted)}
+  .badge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;
+    font-size:13px;font-weight:700;background:var(--card2);border:1px solid var(--line)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  .stat-row{display:flex;gap:10px;margin-top:4px}
+  .stat{flex:1;background:var(--card2);border:1px solid var(--line);border-radius:14px;
+    padding:12px;text-align:center}
+  .stat .v{font-size:18px;font-weight:800}
+  .stat .k{font-size:11px;color:var(--muted);margin-top:2px}
+
+  .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.8px;
+    color:var(--muted);font-weight:700;margin:22px 4px 10px}
+  .chips{display:flex;gap:8px}
+  .chips button{flex:1;padding:14px 6px;font-size:15px}
+  .grid2{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+  .stack{display:flex;flex-direction:column;gap:12px}
+  .hidden{display:none!important}
+
+  .switcher{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{background:var(--card2);border:1px solid var(--line);color:var(--muted);
+    padding:8px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--accent);color:#0a0e1c;border-color:var(--accent)}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+    background:var(--card2);border:1px solid var(--line);color:var(--text);
+    padding:12px 18px;border-radius:12px;box-shadow:var(--shadow);opacity:0;
+    transition:opacity .2s,transform .2s;pointer-events:none;font-weight:600;z-index:50}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .err{color:var(--bad);font-size:13px;margin-top:8px;min-height:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ========== LOGIN ========== -->
+  <section id="login" class="hidden">
+    <div class="card">
+      <div class="logo">🛡️</div>
+      <h1 style="text-align:center">PC-Control</h1>
+      <p class="sub" style="text-align:center;margin:6px 0 18px">
+        Melde dich mit dem Eltern-Passwort an.</p>
+      <label for="server">Server-Adresse</label>
+      <input id="server" type="text" spellcheck="false" autocapitalize="off"
+             placeholder="http://localhost:8765" style="margin-bottom:12px">
+      <label for="pw">Eltern-Passwort</label>
+      <input id="pw" type="password" autocomplete="current-password"
+             placeholder="Passwort" onkeydown="if(event.key==='Enter')login()">
+      <div class="err" id="loginErr"></div>
+      <button class="btn block" onclick="login()">Anmelden</button>
+    </div>
+    <p class="sub" style="text-align:center;margin-top:14px">
+      Das ist dasselbe Passwort wie in der config.json des PCs.</p>
+  </section>
+
+  <!-- ========== DASHBOARD ========== -->
+  <section id="dash" class="hidden">
+    <div class="row between" style="margin-bottom:16px">
+      <div>
+        <h1>PC-Control</h1>
+        <div class="sub" id="devName">–</div>
+      </div>
+      <button class="btn ghost" onclick="logout()" style="padding:9px 12px;font-size:13px">Abmelden</button>
+    </div>
+
+    <!-- Warte-Zustand, wenn noch kein PC verbunden -->
+    <div id="waiting" class="card hidden" style="text-align:center;padding:40px 20px">
+      <div style="font-size:40px">🖥️</div>
+      <h1 style="margin:12px 0 6px;font-size:18px">Noch kein PC verbunden</h1>
+      <p class="sub">Starte den Agent auf dem PC deines Bruders.<br>
+         Sobald er laeuft, erscheint er hier automatisch.</p>
+    </div>
+
+    <div id="content" class="hidden">
+      <div id="switcher" class="switcher hidden"></div>
+      <!-- HERO -->
+      <div class="card hero">
+        <div class="ring">
+          <svg width="220" height="220" viewBox="0 0 220 220">
+            <circle class="track" cx="110" cy="110" r="96" fill="none" stroke-width="16"/>
+            <circle class="prog" id="ring" cx="110" cy="110" r="96" fill="none" stroke-width="16"
+                    stroke-dasharray="603.2" stroke-dashoffset="0"/>
+          </svg>
+          <div class="center">
+            <div class="big" id="remain">–</div>
+            <div class="muted" id="remainSub" style="font-size:13px;margin-top:6px">verbleibend</div>
+          </div>
+        </div>
+        <div class="badge" id="badge"><span class="dot" id="dot"></span><span id="badgeText">–</span></div>
+        <div class="stat-row" style="width:100%">
+          <div class="stat"><div class="v" id="usedV">–</div><div class="k">verbraucht heute</div></div>
+          <div class="stat"><div class="v" id="limitV">–</div><div class="k">Limit heute</div></div>
+          <div class="stat"><div class="v" id="taskV">–</div><div class="k">Coding-Aufgabe</div></div>
+        </div>
+      </div>
+
+      <!-- SCHNELL -->
+      <div class="section-title">Schnell Zeit geben</div>
+      <div class="chips">
+        <button class="btn good" onclick="cmd('add_time',15,'+15 Min')">+15 Min</button>
+        <button class="btn good" onclick="cmd('add_time',30,'+30 Min')">+30 Min</button>
+        <button class="btn ghost" onclick="cmd('add_time',-15,'−15 Min')">−15 Min</button>
+      </div>
+
+      <!-- ZEIT STEUERN -->
+      <div class="section-title">Zeit steuern</div>
+      <div class="card stack">
+        <div>
+          <label>Eigene Minuten gutschreiben</label>
+          <div class="grid2">
+            <input id="customMin" type="number" inputmode="numeric" value="20">
+            <button class="btn" onclick="cmd('add_time',num('customMin'),'Zeit gutgeschrieben')">Geben</button>
+          </div>
+        </div>
+        <div>
+          <label>Limit fuer HEUTE (Minuten)</label>
+          <div class="grid2">
+            <input id="todayLimit" type="number" inputmode="numeric" placeholder="z. B. 120">
+            <button class="btn ghost" onclick="cmd('set_today_limit',num('todayLimit'),'Heutiges Limit gesetzt')">Setzen</button>
+          </div>
+        </div>
+        <div>
+          <label>Standard-Limit pro Tag (jeden Tag um Mitternacht)</label>
+          <div class="grid2">
+            <input id="defLimit" type="number" inputmode="numeric" placeholder="z. B. 120">
+            <button class="btn ghost" onclick="cmd('set_default_limit',num('defLimit'),'Standard-Limit gesetzt')">Setzen</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPERRE -->
+      <div class="section-title">Sperre</div>
+      <div class="card stack">
+        <div>
+          <label>Sofort freischalten (Minuten geben und entsperren)</label>
+          <div class="grid2">
+            <input id="grantMin" type="number" inputmode="numeric" value="30">
+            <button class="btn good" onclick="cmd('grant_access',num('grantMin'),'Freigeschaltet')">Freischalten</button>
+          </div>
+        </div>
+        <button class="btn bad block" onclick="cmd('lock_now',0,'PC wird gesperrt')">🔒 Jetzt sperren</button>
+        <button class="btn warn block" onclick="cmd('skip_coding',0,'Coding-Aufgabe uebersprungen')">Coding-Aufgabe fuer heute ueberspringen</button>
+      </div>
+
+      <button class="btn ghost block" style="margin-top:12px" onclick="removeDevice()">🗑 Diesen PC aus der Liste entfernen</button>
+
+      <p class="sub" id="foot" style="text-align:center;margin-top:18px">–</p>
+    </div>
+  </section>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const RING_LEN = 2 * Math.PI * 96; // = 603.2
+// localStorage kann blockiert sein (Privat-Modus) -> alles absichern
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+let TOKEN = lsGet("pcc_pw") || "";
+let DEVICE = lsGet("pcc_dev") || "";
+let BASE = lsGet("pcc_base") ||
+  (location.protocol.startsWith("http") ? location.origin : "http://localhost:8765");
+let timer = null;
+
+function api(path, opts={}){
+  opts.headers = Object.assign({"Authorization":"Bearer "+TOKEN,
+    "Content-Type":"application/json"}, opts.headers||{});
+  return fetch(BASE + path, opts);
+}
+function num(id){ const v = parseInt($(id).value,10); return isNaN(v)?0:v; }
+
+function fmt(sec){
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec/3600), m = Math.round((sec%3600)/60);
+  if(h>0) return {v:h+":"+String(m).padStart(2,"0"), u:"h"};
+  return {v:String(m), u:"min"};
+}
+function fmtMin(mins){
+  const h=Math.floor(mins/60), m=mins%60;
+  return h>0 ? (h+":"+String(m).padStart(2,"0")+" h") : (m+" min");
+}
+
+function toast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1800);
+}
+
+// ---- Login ----
+function showLogin(msg){
+  $("login").classList.remove("hidden"); $("dash").classList.add("hidden");
+  $("loginErr").textContent = msg||"";
+  if(timer){clearInterval(timer);timer=null;}
+}
+function login(){
+  const pw=$("pw").value.trim();
+  if(!pw){ $("loginErr").textContent="Bitte Passwort eingeben."; return; }
+  let base=($("server").value||"").trim().replace(/\/+$/,"");
+  if(!base){ base = location.protocol.startsWith("http") ? location.origin : "http://localhost:8765"; }
+  BASE=base; TOKEN=pw;
+  fetch(BASE+"/api/devices",{headers:{"Authorization":"Bearer "+pw}})
+    .then(r=>{
+      if(r.status===401){ throw new Error("__PW__"); }
+      if(!r.ok){ throw new Error("__HTTP__"); }
+      return r.json();
+    })
+    .then(()=>{ lsSet("pcc_pw",pw); lsSet("pcc_base",BASE); startDash(); })
+    .catch(e=>{
+      TOKEN="";
+      const m = e && e.message;
+      if(m==="__PW__"){ $("loginErr").textContent="Passwort ist falsch."; }
+      else if(m==="__HTTP__"){ $("loginErr").textContent="Server-Fehler. Laeuft der Server richtig?"; }
+      else { $("loginErr").textContent="Server nicht erreichbar. Laeuft er? Ist die Adresse richtig? ("+BASE+")"; }
+    });
+}
+function logout(){ lsDel("pcc_pw"); TOKEN=""; showLogin(""); }
+
+// ---- Dashboard ----
+function startDash(){
+  $("login").classList.add("hidden"); $("dash").classList.remove("hidden");
+  refresh(); if(timer)clearInterval(timer); timer=setInterval(refresh,5000);
+}
+
+function refresh(){
+  api("/api/devices").then(r=>{ if(r.status===401){throw 0;} return r.json(); })
+    .then(data=>{
+      const devs = data.devices||[];
+      if(devs.length===0){ $("waiting").classList.remove("hidden");
+        $("content").classList.add("hidden"); $("devName").textContent="–"; return; }
+      let dev = devs.find(d=>d.device_id===DEVICE) || devs[0];
+      DEVICE = dev.device_id; lsSet("pcc_dev",DEVICE);
+      $("waiting").classList.add("hidden"); $("content").classList.remove("hidden");
+      render(dev, devs);
+    })
+    .catch(()=>showLogin("Bitte neu anmelden."));
+}
+
+function pickDevice(id){ DEVICE=id; lsSet("pcc_dev",id); refresh(); }
+
+function render(s, devs){
+  // Geraete-Umschalter (nur wenn mehr als ein PC verbunden ist)
+  const sw=$("switcher");
+  if(devs && devs.length>1){
+    sw.innerHTML="";
+    devs.forEach(d=>{
+      const b=document.createElement("button");
+      b.className="chip"+(d.device_id===DEVICE?" on":"");
+      b.textContent=d.hostname||d.device_id;
+      b.onclick=()=>pickDevice(d.device_id);
+      sw.appendChild(b);
+    });
+    sw.classList.remove("hidden");
+  } else { sw.classList.add("hidden"); }
+
+  $("devName").textContent = (s.hostname||s.device_id||"PC");
+  const limit = (s.today_limit_minutes||0)*60 + (s.extra_minutes||0)*60;
+  const used = s.used_seconds||0;
+  const remain = Math.max(0, (s.remaining_seconds!=null)?s.remaining_seconds:(limit-used));
+
+  const rf=fmt(remain);
+  $("remain").innerHTML = rf.v+' <small>'+rf.u+'</small>';
+  $("usedV").textContent = fmtMin(Math.round(used/60));
+  $("limitV").textContent = fmtMin((s.today_limit_minutes||0)+(s.extra_minutes||0));
+  $("taskV").textContent = (s.problem_number||1)+"/"+(s.problem_total||"–");
+
+  // Ring
+  const frac = limit>0 ? Math.max(0,Math.min(1, remain/limit)) : 0;
+  const ring=$("ring");
+  ring.style.strokeDashoffset = RING_LEN*(1-frac);
+  let col = getCss('--good');
+  if(frac<=0.12) col=getCss('--bad'); else if(frac<=0.30) col=getCss('--warn');
+  if(s.locked) col=getCss('--bad');
+  ring.style.stroke = col;
+
+  // Badge / Verbindung
+  const online = (Date.now()/1000 - (s.ts||0)) < 30;
+  $("dot").style.background = online ? getCss('--good') : getCss('--bad');
+  let text = "Aktiv";
+  if(!online) text="Offline (PC aus?)";
+  else if(s.mode==="coding") text="Coding-Aufgabe offen";
+  else if(s.mode==="timeup") text="Gesperrt – Zeit um";
+  else if(s.mode==="idle") text="Am PC, gerade inaktiv";
+  else text="Aktiv am Spielen";
+  $("badgeText").textContent = text;
+
+  // Platzhalter fuer Eingaben (nur wenn leer, damit man tippen kann)
+  if(document.activeElement!==$("defLimit")) $("defLimit").placeholder = (s.default_limit_minutes||120);
+  if(document.activeElement!==$("todayLimit")) $("todayLimit").placeholder = (s.today_limit_minutes||120);
+
+  const d=new Date((s.ts||0)*1000);
+  $("foot").textContent = "Zuletzt aktualisiert: " + (s.ts? d.toLocaleTimeString('de-DE'):"–")
+    + " · Aufgabe " + (s.problem_number||1) + " von " + (s.problem_total||"–")
+    + (s.coding_done_today ? " · heute geloest ✓" : " · heute offen");
+  $("remainSub").textContent = s.locked ? "gesperrt" : "verbleibend heute";
+}
+
+function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+// ---- Befehl senden ----
+function cmd(type, value, okMsg){
+  if(!DEVICE){ toast("Kein PC verbunden"); return; }
+  api("/api/"+encodeURIComponent(DEVICE)+"/command",
+      {method:"POST", body:JSON.stringify({type:type, value:value})})
+    .then(r=>{ if(!r.ok) throw 0; toast(okMsg||"Gesendet"); setTimeout(refresh,600); })
+    .catch(()=>toast("Fehler beim Senden"));
+}
+
+function removeDevice(){
+  if(!DEVICE){ toast("Kein PC ausgewaehlt"); return; }
+  if(!confirm("Diesen PC ('"+DEVICE+"') aus der Liste entfernen?\n\nHinweis: Wenn der Agent auf dem PC noch laeuft, meldet er sich in ein paar Sekunden wieder. Zum echten Entfernen vorher den Agent beenden/deinstallieren.")) return;
+  api("/api/"+encodeURIComponent(DEVICE)+"/forget",{method:"POST"})
+    .then(r=>{ if(!r.ok) throw 0; lsDel("pcc_dev"); DEVICE=""; toast("PC entfernt"); setTimeout(refresh,500); })
+    .catch(()=>toast("Fehler beim Entfernen"));
+}
+
+// ---- Start ----
+$("server").value = BASE;
+if(TOKEN){ startDash(); } else { showLogin(""); }
+</script>
+</body>
+</html>

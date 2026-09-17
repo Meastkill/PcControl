@@ -1,0 +1,2 @@
+# Der Relay-Server braucht KEINE Extra-Pakete.
+# Diese Datei sagt Hosting-Diensten (z. B. Render) nur: "Das ist ein Python-Projekt."
