@@ -199,6 +199,27 @@
         <button class="btn warn block" onclick="cmd('skip_coding',0,'Coding-Aufgabe uebersprungen')">Coding-Aufgabe fuer heute ueberspringen</button>
       </div>
 
+      <!-- ZEITPLAN -->
+      <div class="section-title">Zeitplan (Wochentage)</div>
+      <div class="card">
+        <p class="muted" style="font-size:13px;margin:0 0 10px">
+          Statt eines einfachen Tageslimits kannst du pro Wochentag Zeitfenster
+          festlegen – z. B. Sa/So 08:00–12:00 mit 120&nbsp;Min und 14:00–22:00
+          mit 120&nbsp;Min. Ausserhalb der Fenster ist der PC gesperrt.</p>
+        <button class="btn block" id="schedOpen" onclick="openSchedule()">🗓 Zeitplan bearbeiten</button>
+        <div id="schedBox" hidden>
+          <label class="row" style="gap:8px;margin:0 0 8px;cursor:pointer;font-weight:700">
+            <input type="checkbox" id="schedEnabled" style="width:auto"> Zeitplan benutzen (statt Tageslimit)
+          </label>
+          <p class="muted" style="font-size:11px;margin:0 2px 12px">Pro Zeile: Start · Ende · erlaubte Minuten</p>
+          <div id="schedDays"></div>
+          <div class="row" style="gap:8px;margin-top:12px">
+            <button class="btn good block" onclick="saveSchedule()">Speichern</button>
+            <button class="btn ghost" onclick="closeSchedule()" style="padding:12px 16px">Schliessen</button>
+          </div>
+        </div>
+      </div>
+
       <button class="btn ghost block" style="margin-top:12px" onclick="removeDevice()">🗑 Diesen PC aus der Liste entfernen</button>
 
       <p class="sub" id="foot" style="text-align:center;margin-top:18px">–</p>
@@ -222,6 +243,7 @@ let DEVICE = lsGet("pcc_dev") || "";
 let BASE = lsGet("pcc_base") ||
   (location.protocol.startsWith("http") ? location.origin : "http://localhost:8765");
 let timer = null;
+let lastStatus = null;
 
 function api(path, opts={}){
   opts.headers = Object.assign({"Authorization":"Bearer "+TOKEN,
@@ -298,6 +320,7 @@ function refresh(){
 function pickDevice(id){ DEVICE=id; lsSet("pcc_dev",id); refresh(); }
 
 function render(s, devs){
+  lastStatus = s;
   // Geraete-Umschalter (nur wenn mehr als ein PC verbunden ist)
   const sw=$("switcher");
   if(devs && devs.length>1){
@@ -313,14 +336,15 @@ function render(s, devs){
   } else { sw.classList.add("hidden"); }
 
   $("devName").textContent = (s.hostname||s.device_id||"PC");
-  const limit = (s.today_limit_minutes||0)*60 + (s.extra_minutes||0)*60;
-  const used = s.used_seconds||0;
+  const limit = (s.limit_seconds!=null) ? s.limit_seconds
+              : ((s.today_limit_minutes||0)*60 + (s.extra_minutes||0)*60);
+  const used  = (s.used_display_seconds!=null) ? s.used_display_seconds : (s.used_seconds||0);
   const remain = Math.max(0, (s.remaining_seconds!=null)?s.remaining_seconds:(limit-used));
 
   const rf=fmt(remain);
   $("remain").innerHTML = rf.v+' <small>'+rf.u+'</small>';
   $("usedV").textContent = fmtMin(Math.round(used/60));
-  $("limitV").textContent = fmtMin((s.today_limit_minutes||0)+(s.extra_minutes||0));
+  $("limitV").textContent = fmtMin(Math.round(limit/60));
   $("taskV").textContent = (s.problem_number||1)+"/"+(s.problem_total||"–");
 
   // Ring
@@ -335,13 +359,7 @@ function render(s, devs){
   // Badge / Verbindung
   const online = (Date.now()/1000 - (s.ts||0)) < 30;
   $("dot").style.background = online ? getCss('--good') : getCss('--bad');
-  let text = "Aktiv";
-  if(!online) text="Offline (PC aus?)";
-  else if(s.mode==="coding") text="Coding-Aufgabe offen";
-  else if(s.mode==="timeup") text="Gesperrt – Zeit um";
-  else if(s.mode==="idle") text="Am PC, gerade inaktiv";
-  else text="Aktiv am Spielen";
-  $("badgeText").textContent = text;
+  $("badgeText").textContent = online ? (s.status_text || "Aktiv") : "Offline (PC aus?)";
 
   // Platzhalter fuer Eingaben (nur wenn leer, damit man tippen kann)
   if(document.activeElement!==$("defLimit")) $("defLimit").placeholder = (s.default_limit_minutes||120);
@@ -351,7 +369,8 @@ function render(s, devs){
   $("foot").textContent = "Zuletzt aktualisiert: " + (s.ts? d.toLocaleTimeString('de-DE'):"–")
     + " · Aufgabe " + (s.problem_number||1) + " von " + (s.problem_total||"–")
     + (s.coding_done_today ? " · heute geloest ✓" : " · heute offen");
-  $("remainSub").textContent = s.locked ? "gesperrt" : "verbleibend heute";
+  $("remainSub").textContent = s.locked ? "gesperrt"
+    : (s.schedule_active ? "in diesem Zeitfenster" : "verbleibend heute");
 }
 
 function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
@@ -371,6 +390,75 @@ function removeDevice(){
   api("/api/"+encodeURIComponent(DEVICE)+"/forget",{method:"POST"})
     .then(r=>{ if(!r.ok) throw 0; lsDel("pcc_dev"); DEVICE=""; toast("PC entfernt"); setTimeout(refresh,500); })
     .catch(()=>toast("Fehler beim Entfernen"));
+}
+
+// ---- Zeitplan-Editor ----
+const TAGE=["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+let schedDraft=null;
+
+function openSchedule(){
+  const sch=(lastStatus&&lastStatus.schedule)||{enabled:false,days:{}};
+  schedDraft={enabled:!!sch.enabled, days:{}};
+  for(let d=0;d<7;d++){
+    const arr=(sch.days&&sch.days[d])?sch.days[d]:[];
+    schedDraft.days[d]=arr.map(w=>({start:w.start||"08:00",end:w.end||"20:00",minutes:w.minutes||60}));
+  }
+  buildSchedule();
+  $("schedBox").hidden=false; $("schedOpen").hidden=true;
+}
+function closeSchedule(){ $("schedBox").hidden=true; $("schedOpen").hidden=false; }
+
+function buildSchedule(){
+  $("schedEnabled").checked=schedDraft.enabled;
+  const box=$("schedDays"); box.innerHTML="";
+  for(let d=0;d<7;d++){
+    const card=document.createElement("div");
+    card.className="card"; card.style.cssText="margin-bottom:10px;padding:14px";
+    const head=document.createElement("div"); head.className="row between";
+    const h=document.createElement("div"); h.style.fontWeight="800"; h.textContent=TAGE[d];
+    head.appendChild(h);
+    const copy=document.createElement("button");
+    copy.className="btn ghost"; copy.style.cssText="padding:6px 10px;font-size:12px";
+    copy.textContent="auf alle kopieren"; copy.onclick=()=>copyDay(d);
+    head.appendChild(copy); card.appendChild(head);
+    if(schedDraft.days[d].length===0){
+      const p=document.createElement("div"); p.className="muted";
+      p.style.cssText="font-size:12px;margin-top:6px"; p.textContent="Keine Spielzeit an diesem Tag.";
+      card.appendChild(p);
+    }
+    schedDraft.days[d].forEach((w,i)=>card.appendChild(windowRow(d,i,w)));
+    const add=document.createElement("button");
+    add.className="btn ghost block"; add.style.marginTop="8px"; add.textContent="+ Zeitfenster";
+    add.onclick=()=>{ schedDraft.days[d].push({start:"08:00",end:"20:00",minutes:60}); buildSchedule(); };
+    card.appendChild(add); box.appendChild(card);
+  }
+}
+function windowRow(d,i,w){
+  const row=document.createElement("div");
+  row.style.cssText="display:grid;grid-template-columns:1fr 1fr 74px 40px;gap:6px;margin-top:8px;align-items:center";
+  const mk=(type,val,on)=>{ const el=document.createElement("input"); el.type=type; el.value=val; el.onchange=()=>on(el); return el; };
+  const s=mk("time",w.start,el=>w.start=el.value);
+  const e=mk("time",w.end,el=>w.end=el.value);
+  const m=mk("number",w.minutes,el=>w.minutes=parseInt(el.value)||0); m.min="1"; m.title="Minuten";
+  const x=document.createElement("button"); x.className="btn bad"; x.style.cssText="padding:8px 0";
+  x.textContent="×"; x.onclick=()=>{ schedDraft.days[d].splice(i,1); buildSchedule(); };
+  row.append(s,e,m,x); return row;
+}
+function copyDay(d){
+  const src=JSON.stringify(schedDraft.days[d]);
+  for(let k=0;k<7;k++) schedDraft.days[k]=JSON.parse(src);
+  buildSchedule(); toast("Auf alle Tage kopiert");
+}
+function saveSchedule(){
+  schedDraft.enabled=$("schedEnabled").checked;
+  const clean={enabled:schedDraft.enabled, days:{}};
+  for(let d=0;d<7;d++){
+    clean.days[d]=(schedDraft.days[d]||[])
+      .filter(w=>w.start&&w.end&&w.start<w.end&&w.minutes>0)
+      .map(w=>({start:w.start,end:w.end,minutes:parseInt(w.minutes)||0}));
+  }
+  cmd("set_schedule", clean, "Zeitplan gespeichert");
+  closeSchedule();
 }
 
 // ---- Start ----
